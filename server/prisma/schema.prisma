@@ -1,0 +1,130 @@
+// DevGym data model. SQLite = one local file (prisma/devgym.db), no account needed.
+// To move to Neon/PostgreSQL later: change provider to "postgresql" and url to env("DATABASE_URL").
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./devgym.db"
+}
+
+// ---------- Coding practice ----------
+
+model Challenge {
+  id             Int       @id @default(autoincrement())
+  slug           String    @unique
+  title          String
+  difficulty     String    // "easy" | "medium" | "hard"
+  topic          String    // e.g. "strings", "arrays", "objects"
+  level          Int       // 1 = foundations ... 7 = senior skills
+  prompt         String
+  functionName   String
+  starterCode    String
+  tests          String    // JSON: [{ "args": [...], "expected": ... }]
+  hints          String    // JSON: ["hint 1", "hint 2"]
+  solution       String
+  reviewDueAt    DateTime? // set when you fail, so it comes back
+  reviewInterval Int       @default(0)
+  attempts       Attempt[]
+  note           String    @default("")
+}
+
+model Attempt {
+  id          Int       @id @default(autoincrement())
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  challengeId Int
+  code        String
+  passed      Int
+  total       Int
+  durationMs  Int
+  createdAt   DateTime  @default(now())
+
+  @@index([createdAt])
+}
+
+// ---------- Exam study ----------
+
+model Subject {
+  id        Int                @id @default(autoincrement())
+  name      String             @unique
+  topics    Topic[]
+  cards     Card[]
+  questions PracticeQuestion[]
+  sessions  StudySession[]
+}
+
+model Topic {
+  id        Int     @id @default(autoincrement())
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId Int
+  name      String
+  status    String  @default("todo") // "todo" | "learning" | "done"
+}
+
+// Flashcards. deck = "exam" (per subject) or "defense" (thesis defense questions)
+model Card {
+  id           Int      @id @default(autoincrement())
+  deck         String   @default("exam")
+  subject      Subject? @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId    Int?
+  front        String
+  back         String
+  dueAt        DateTime @default(now())
+  intervalDays Int      @default(0)
+  ease         Float    @default(2.5)
+  reps         Int      @default(0)
+
+  @@index([dueAt])
+}
+
+model PracticeQuestion {
+  id          Int      @id @default(autoincrement())
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId   Int
+  question    String
+  modelAnswer String
+  myAnswer    String   @default("")
+  lastScore   Int?     // 0-5 self-grade
+  attempts    Int      @default(0)
+}
+
+model StudySession {
+  id        Int      @id @default(autoincrement())
+  subject   Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  subjectId Int?
+  label     String   @default("")
+  minutes   Int
+  startedAt DateTime @default(now())
+
+  @@index([startedAt])
+}
+
+// ---------- Thesis ----------
+
+model Chapter {
+  id      Int       @id @default(autoincrement())
+  order   Int
+  title   String
+  status  String    @default("not_started") // "not_started" | "drafting" | "review" | "done"
+  dueDate DateTime?
+  notes   String    @default("")
+  sources Source[]
+}
+
+model Source {
+  id        Int      @id @default(autoincrement())
+  chapter   Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  chapterId Int?
+  citation  String
+  url       String   @default("")
+  notes     String   @default("")
+}
+
+model WritingLog {
+  id    Int      @id @default(autoincrement())
+  date  DateTime @default(now())
+  words Int
+  note  String   @default("")
+}
